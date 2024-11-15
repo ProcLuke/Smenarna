@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
-from os.path import basename, splitext
+from os.path import basename, splitext, exists
 import tkinter as tk
+from tkinter import messagebox
+from tkinter import ttk
 import datetime
 import requests
 
@@ -65,8 +67,25 @@ class Application(tk.Tk):
         self.rbtnPurchase.pack()
         self.rbtnSale.pack()
 
+        self.varTransaction.trace_add("read", self.transactionClick)
+
+        self.cboxCountry = ttk.Combobox(self, values=[])
+        self.cboxCountry.set("Vyber zemi...")
+        self.cboxCountry.pack(anchor="w", padx=5, pady=5)
+        self.cboxCountry.bind("<<ComboboxSelected>>", self.on_select)
+
+        self.lblCourse = tk.LabelFrame(self, text="Kurz")
+        self.lblCourse.pack(anchor='w', padx=5, pady=5)
+        self.entryAmount = MyEntry(self.lblCourse, state="readonly")
+        self.entryAmount.pack()
+        self.entryRate = MyEntry(self.lblCourse, state="readonly")
+        self.entryRate.pack()
+
         self.btn = tk.Button(self, text="Quit", command=self.quit)
         self.btn.pack()
+
+    def transactionClick(self, *arg):
+        self.on_select()
 
     def chbtnAutoClick(self):
         if self.varAuto.get():
@@ -79,13 +98,37 @@ class Application(tk.Tk):
         try:
             response = requests.get(URL)
             data = response.text
-            with open('kurzovni_listek.text', 'w') as f:
+            with open('kurzovni_listek.txt', 'w') as f:
                 f.write(data)
-            for line in data.splitlines()[2:]:
-                country, currency, amount, code, rate = line.split('|')
         except requests.exceptions.ConnectionError as e:
             print(f"Error: {e}")
-            return
+            if not exists('kurzovni_listek.txt'):
+                messagebox.showerror("Chyba:", "Kurzovní lístek nenalezen")
+                return
+            with open('kurzovni_listek.txt', 'r') as f:
+                data = f.read()
+        self.ticket = {}
+        for line in data.splitlines()[2:]:
+            country, currency, amount, code, rate = line.split('|')
+            self.ticket[country] = {
+                'currency' : currency,
+                'amount' : amount,
+                'code' : code,
+                'rate' : rate,
+            }
+        self.cboxCountry.config(values=list(self.ticket.keys()))
+
+    def on_select(self, event=None):
+        country = self.cboxCountry.get()
+        self.lblCourse.config(text=self.ticket[country]['code'])
+        self.amount = int(self.ticket[country]['amount'])
+        if self.varTransaction.get() == 'purchase':
+            self.rate = float(self.ticket[country]['rate']) * 0.96
+        else:
+            self.rate = float(self.ticket[country]['rate']) * 1.04
+
+        self.entryAmount.value = str(self.amount)
+        self.entryRate.value = str(self.rate)
 
     def quit(self, event=None):
         super().destroy()
