@@ -51,7 +51,7 @@ class Application(tk.Tk):
         self.bind("<Escape>", self.quit)
         self.lbl = tk.Label(self, text="Smenarna")
         self.lbl.pack()
-
+        self.bind(self.on_load)
 
         self.varAuto = tk.BooleanVar()
         self.chbtnAuto = tk.Checkbutton(self, text="Stahovat automaticky kurzovní lístek", variable=self.varAuto, command=self.chbtnAutoClick)
@@ -67,7 +67,7 @@ class Application(tk.Tk):
         self.rbtnPurchase.pack()
         self.rbtnSale.pack()
 
-        self.varTransaction.trace_add("read", self.transactionClick)
+        self.varTransaction.trace_add("write", self.transactionClick)
 
         self.cboxCountry = ttk.Combobox(self, values=[])
         self.cboxCountry.set("Vyber zemi...")
@@ -84,6 +84,8 @@ class Application(tk.Tk):
         self.btn = tk.Button(self, text="Quit", command=self.quit)
         self.btn.pack()
 
+        self.on_load()
+
     def transactionClick(self, *arg):
         self.on_select()
 
@@ -98,15 +100,21 @@ class Application(tk.Tk):
         try:
             response = requests.get(URL)
             data = response.text
-            with open('kurzovni_listek.txt', 'w') as f:
-                f.write(data)
+            self.on_load
         except requests.exceptions.ConnectionError as e:
             print(f"Error: {e}")
             if not exists('kurzovni_listek.txt'):
                 messagebox.showerror("Chyba:", "Kurzovní lístek nenalezen")
                 return
-            with open('kurzovni_listek.txt', 'r') as f:
-                data = f.read()
+            self.on_load
+        
+
+    def on_load(self):
+        if not exists('kurzovni_listek.txt'):
+                messagebox.showerror("Chyba:", "Kurzovní lístek nenalezen")
+                return
+        with open('kurzovni_listek.txt', 'r') as f:
+            data = f.read()
         self.ticket = {}
         for line in data.splitlines()[2:]:
             country, currency, amount, code, rate = line.split('|')
@@ -119,16 +127,19 @@ class Application(tk.Tk):
         self.cboxCountry.config(values=list(self.ticket.keys()))
 
     def on_select(self, event=None):
-        country = self.cboxCountry.get()
-        self.lblCourse.config(text=self.ticket[country]['code'])
-        self.amount = int(self.ticket[country]['amount'])
-        if self.varTransaction.get() == 'purchase':
-            self.rate = float(self.ticket[country]['rate']) * 0.96
-        else:
-            self.rate = float(self.ticket[country]['rate']) * 1.04
+        try:
+            country = self.cboxCountry.get()
+            self.lblCourse.config(text=self.ticket[country]['code'])
+            self.amount = int(self.ticket[country]['amount'])
+            if self.varTransaction.get() == 'purchase':
+                self.rate = float(self.ticket[country]['rate']) * 0.96
+            else:
+                self.rate = float(self.ticket[country]['rate']) * 1.04
 
-        self.entryAmount.value = str(self.amount)
-        self.entryRate.value = str(self.rate)
+            self.entryAmount.value = str(self.amount)
+            self.entryRate.value = str(self.rate)
+        except KeyError:
+            pass
 
     def quit(self, event=None):
         super().destroy()
